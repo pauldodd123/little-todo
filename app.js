@@ -1,7 +1,8 @@
 import { Store } from './vcs.js';
-import { credentials } from './config.js';
 
 const KEY = 'todos';
+const LS_KEY = 'little-todo.credentials';
+const FIELDS = ['endpoint', 'storeId', 'accessToken', 'encryptionKey'];
 const $ = id => document.getElementById(id);
 const list = $('list'), status = $('status'), input = $('new-todo'), count = $('count');
 
@@ -17,7 +18,37 @@ function setStatus(text, isError = false) {
 
 function setBusy(flag) {
   busy = flag;
-  for (const el of document.querySelectorAll('button, input')) el.disabled = flag;
+  for (const el of document.querySelectorAll('#app button, #app input')) el.disabled = flag;
+}
+
+// Credentials come from (in order): the URL hash (#storeId=…&accessToken=…&encryptionKey=…),
+// localStorage, or the connect form. The hash is scrubbed from the address bar once read.
+function loadCredentials() {
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (hash.get('storeId')) {
+    const c = { endpoint: hash.get('endpoint') || 'https://api.vibecodestorage.com' };
+    for (const f of FIELDS.slice(1)) c[f] = hash.get(f) || '';
+    saveCredentials(c);
+    history.replaceState(null, '', location.pathname + location.search);
+    return c;
+  }
+  try { const raw = localStorage.getItem(LS_KEY); if (raw) return JSON.parse(raw); } catch {}
+  return null;
+}
+
+function saveCredentials(c) { try { localStorage.setItem(LS_KEY, JSON.stringify(c)); } catch {} }
+
+function validate(c) {
+  if (!c || typeof c !== 'object') throw new Error('Credentials must be a JSON object.');
+  c.endpoint ||= 'https://api.vibecodestorage.com';
+  for (const f of FIELDS) if (typeof c[f] !== 'string' || !c[f]) throw new Error(`Missing ${f}.`);
+  return c;
+}
+
+function showConnect(message) {
+  $('connect').hidden = false;
+  $('app').hidden = true;
+  setStatus(message || '');
 }
 
 function render() {
@@ -88,11 +119,9 @@ async function mutate(fn) {
 function explain(e) {
   console.error(e);
   if (e.code === 'NETWORK' || e.code === 'ORIGIN_DENIED') {
-    setStatus(`The storage API refused this page's origin (${location.origin}). ` +
-      'VibeCodeStorage does not allow browser origins by default, so this origin must be allowlisted on the service. ' +
-      `(${e.message})`, true);
-  } else if (e.status === 401 || e.status === 403) {
-    setStatus(`Storage rejected the credentials: ${e.message}`, true);
+    setStatus(`Could not reach the storage API from ${location.origin}. (${e.message})`, true);
+  } else if (e.status === 401 || e.status === 403 || e.status === 404) {
+    setStatus(`Storage rejected the credentials: ${e.message}. Disconnect and try again.`, true);
   } else if (e.status === 429 || e.status === 503) {
     setStatus(`Storage is busy or a pilot limit was hit. Try again shortly. (${e.message})`, true);
   } else {
@@ -100,6 +129,28 @@ function explain(e) {
   }
 }
 
+function connect(c) {
+  try {
+    store = new Store(validate(c));
+  } catch (e) {
+    showConnect(`Bad credentials: ${e.message}`);
+    status.className = 'status error';
+    return;
+  }
+  saveCredentials(c);
+  $('connect').hidden = true;
+  $('app').hidden = false;
+  load();
+}
+
+$('connect-form').addEventListener('submit', ev => {
+  ev.preventDefault();
+  let parsed;
+  try { parsed = JSON.parse($('creds').value); }
+  catch { showConnect('That is not valid JSON.'); status.className = 'status error'; return; }
+  $('creds').value = '';
+  connect(parsed);
+});
 $('add-form').addEventListener('submit', ev => {
   ev.preventDefault();
   const text = input.value.trim();
@@ -109,10 +160,17 @@ $('add-form').addEventListener('submit', ev => {
 });
 $('clear-done').addEventListener('click', () => mutate(ts => ts.filter(t => !t.done)));
 $('refresh').addEventListener('click', load);
+$('share').addEventListener('click', async () => {
+  const c = JSON.parse(localStorage.getItem(LS_KEY));
+  const url = location.origin + location.pathname + '#' + new URLSearchParams(c).toString();
+  try { await navigator.clipboard.writeText(url); setStatus('Share link copied. Anyone with it can read and edit this list.'); }
+  catch { prompt('Copy this link:', url); }
+});
+$('disconnect').addEventListener('click', () => {
+  try { localStorage.removeItem(LS_KEY); } catch {}
+  todos = []; version = 0; store = null;
+  showConnect('Disconnected.');
+});
 
-try {
-  store = new Store(credentials);
-  load();
-} catch (e) {
-  setStatus(`Bad config: ${e.message}`, true);
-}
+const saved = loadCredentials();
+if (saved) connect(saved); else showConnect();

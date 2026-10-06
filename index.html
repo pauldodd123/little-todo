@@ -13,18 +13,30 @@
       <p class="sub">Stored encrypted on <a href="https://vibecodestorage.com" target="_blank" rel="noopener">vibecodestorage.com</a></p>
     </header>
 
-    <form id="add-form" autocomplete="off">
-      <input id="new-todo" type="text" placeholder="What needs doing?" maxlength="200" required>
-      <button type="submit">Add</button>
-    </form>
+    <section id="connect" hidden>
+      <p>Paste the store credentials to connect. They stay in this browser only.</p>
+      <form id="connect-form" autocomplete="off">
+        <textarea id="creds" rows="5" placeholder='{"endpoint":"https://api.vibecodestorage.com","storeId":"…","accessToken":"…","encryptionKey":"…"}' required></textarea>
+        <button type="submit">Connect</button>
+      </form>
+    </section>
 
-    <ul id="list" aria-live="polite"></ul>
+    <section id="app" hidden>
+      <form id="add-form" autocomplete="off">
+        <input id="new-todo" type="text" placeholder="What needs doing?" maxlength="200" required>
+        <button type="submit">Add</button>
+      </form>
 
-    <footer>
-      <span id="count"></span>
-      <button id="clear-done" type="button" class="link">Clear done</button>
-      <button id="refresh" type="button" class="link">Refresh</button>
-    </footer>
+      <ul id="list" aria-live="polite"></ul>
+
+      <footer>
+        <span id="count"></span>
+        <button id="clear-done" type="button" class="link">Clear done</button>
+        <button id="refresh" type="button" class="link">Refresh</button>
+        <button id="share" type="button" class="link" title="Copy a link that opens this list elsewhere">Share link</button>
+        <button id="disconnect" type="button" class="link">Disconnect</button>
+      </footer>
+    </section>
 
     <div id="status" class="status" role="status"></div>
   </main>
