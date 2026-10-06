@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Little To-Do</title>
   <link rel="stylesheet" href="style.css">
-  <script type="module" src="./vcs-connect.mjs"></script>
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -14,6 +13,14 @@
       <h1>Little To-Do</h1>
       <p class="sub">Stored encrypted on <a href="https://vibecodestorage.com" target="_blank" rel="noopener">vibecodestorage.com</a></p>
     </header>
+
+    <div id="incoming" class="notice" hidden>
+      <p>Open the shared list in this browser? Anyone with the link can read, edit and delete it.</p>
+      <div class="row">
+        <button id="incoming-yes" type="button">Open shared list</button>
+        <button id="incoming-no" type="button" class="link">Cancel</button>
+      </div>
+    </div>
 
     <form id="add-form" autocomplete="off">
       <input id="new-todo" type="text" placeholder="What needs doing?" maxlength="200" required>
@@ -26,11 +33,10 @@
       <span id="count"></span>
       <button id="clear-done" type="button" class="link">Clear done</button>
       <button id="refresh" type="button" class="link">Refresh</button>
+      <button id="share" type="button" class="link" title="Copy a private link that opens this list on another device">Share link</button>
     </footer>
 
     <div id="status" class="status" role="status"></div>
-
-    <vcs-connect name="little-todo"></vcs-connect>
   </main>
 </body>
 </html>
