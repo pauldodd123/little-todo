@@ -1,25 +1,27 @@
 # Little To-Do
 
 A tiny static to-do list that keeps its data in an encrypted
-[VibeCodeStorage](https://vibecodestorage.com) store. No framework, no build
-step, no login. Live at https://pauldodd123.github.io/little-todo/
+[VibeCodeStorage](https://vibecodestorage.com) store, using the
+[Connect component](https://vibecodestorage.com/connect.html). No framework,
+no build step, no login. Live at https://pauldodd123.github.io/little-todo/
 
-- `index.html`, `style.css`, `app.js`: the UI.
-- `vcs.js`: a small browser client speaking the VibeCodeStorage wire format
-  (HKDF-derived keys, AES-256-GCM envelopes, HMAC row ids, If-Match versions).
+- `index.html`, `style.css`, `app.js`: the UI. `app.js` only reads and writes
+  the list; it never sees credentials directly.
+- `vcs-connect.mjs`, `browser-storage.mjs`, `connection-transfer.mjs`,
+  `client/`: the Connect component and SDK, copied unchanged from
+  `vcs-connect.zip` (MIT).
 
-## Connecting
+## How it works
 
-No credentials are committed. On first visit the page asks for the store
-credentials as JSON (`endpoint`, `storeId`, `accessToken`, `encryptionKey`)
-and keeps them in that browser's localStorage. "Share link" copies a URL with
-the credentials in the hash so the same list opens on another device; the
-hash never reaches a server. Anyone with the credentials can read, edit or
-delete the list, so use test data only.
+Opening the page creates nothing. The first save calls `getStore()` on the
+component, which provisions one private pilot store for this browser profile
+and keeps its credentials in localStorage. Reloads reuse that store. The
+component's "Connection & recovery" panel can save a recovery file, restore
+one, or copy a private transfer link to connect another device. The app
+listens for `vcs-connected` and reloads the list after a restore or transfer.
 
-Store creation is blocked for browser origins by the API, so make the store
-once from Node with the official SDK and paste its credentials in. Reads and
-writes to an existing store are allowed from any origin.
+Each browser profile is its own list. Anyone with the recovery file or
+transfer link can read, edit or delete that list, so use test data only.
 
 ## Data model
 

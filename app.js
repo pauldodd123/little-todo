@@ -1,12 +1,12 @@
-import { Store } from './vcs.js';
+// Little To-Do, backed by the VibeCodeStorage Connect component.
+// The component owns the store credentials; this file only reads and writes the list.
 
 const KEY = 'todos';
-const LS_KEY = 'little-todo.credentials';
-const FIELDS = ['endpoint', 'storeId', 'accessToken', 'encryptionKey'];
 const $ = id => document.getElementById(id);
 const list = $('list'), status = $('status'), input = $('new-todo'), count = $('count');
 
-let store;
+let connection;
+let store = null;
 let todos = [];
 let version = 0;
 let busy = false;
@@ -18,37 +18,7 @@ function setStatus(text, isError = false) {
 
 function setBusy(flag) {
   busy = flag;
-  for (const el of document.querySelectorAll('#app button, #app input')) el.disabled = flag;
-}
-
-// Credentials come from (in order): the URL hash (#storeId=…&accessToken=…&encryptionKey=…),
-// localStorage, or the connect form. The hash is scrubbed from the address bar once read.
-function loadCredentials() {
-  const hash = new URLSearchParams(location.hash.slice(1));
-  if (hash.get('storeId')) {
-    const c = { endpoint: hash.get('endpoint') || 'https://api.vibecodestorage.com' };
-    for (const f of FIELDS.slice(1)) c[f] = hash.get(f) || '';
-    saveCredentials(c);
-    history.replaceState(null, '', location.pathname + location.search);
-    return c;
-  }
-  try { const raw = localStorage.getItem(LS_KEY); if (raw) return JSON.parse(raw); } catch {}
-  return null;
-}
-
-function saveCredentials(c) { try { localStorage.setItem(LS_KEY, JSON.stringify(c)); } catch {} }
-
-function validate(c) {
-  if (!c || typeof c !== 'object') throw new Error('Credentials must be a JSON object.');
-  c.endpoint ||= 'https://api.vibecodestorage.com';
-  for (const f of FIELDS) if (typeof c[f] !== 'string' || !c[f]) throw new Error(`Missing ${f}.`);
-  return c;
-}
-
-function showConnect(message) {
-  $('connect').hidden = false;
-  $('app').hidden = true;
-  setStatus(message || '');
+  for (const el of document.querySelectorAll('#add-form button, #add-form input, footer button')) el.disabled = flag;
 }
 
 function render() {
@@ -78,13 +48,26 @@ function render() {
   $('clear-done').hidden = !todos.some(t => t.done);
 }
 
+// getStore() provisions a store on an unconnected browser, so it is only ever
+// reached from a real save (mutate) or when the component says it is connected.
+async function ensureStore() {
+  if (!store) store = await connection.getStore();
+  return store;
+}
+
 async function load() {
   setBusy(true);
   setStatus('Loading…');
   try {
-    const entry = await store.getEntry(KEY);
-    todos = Array.isArray(entry.value) ? entry.value : [];
-    version = entry.version;
+    const s = await ensureStore();
+    try {
+      const entry = await s.getEntry(KEY);
+      todos = Array.isArray(entry.value) ? entry.value : [];
+      version = entry.version;
+    } catch (e) {
+      if (e.status !== 404) throw e;
+      todos = []; version = 0;
+    }
     render();
     setStatus(`Synced (v${version})`);
   } catch (e) {
@@ -99,14 +82,15 @@ async function mutate(fn) {
   setBusy(true);
   setStatus('Saving…');
   try {
-    const result = await store.set(KEY, next, version);
+    const s = await ensureStore();
+    const result = await s.set(KEY, next, { version });
     todos = next;
     version = result.version;
     render();
     setStatus(`Saved (v${version})`);
   } catch (e) {
     if (e.status === 409) {
-      setStatus('Someone else saved first. Reloading the latest list…', true);
+      setStatus('Another tab saved first. Reloading the latest list…', true);
       setBusy(false);
       await load();
       return;
@@ -118,39 +102,13 @@ async function mutate(fn) {
 
 function explain(e) {
   console.error(e);
-  if (e.code === 'NETWORK' || e.code === 'ORIGIN_DENIED') {
-    setStatus(`Could not reach the storage API from ${location.origin}. (${e.message})`, true);
-  } else if (e.status === 401 || e.status === 403 || e.status === 404) {
-    setStatus(`Storage rejected the credentials: ${e.message}. Disconnect and try again.`, true);
-  } else if (e.status === 429 || e.status === 503) {
-    setStatus(`Storage is busy or a pilot limit was hit. Try again shortly. (${e.message})`, true);
+  if (e.status === 429 || e.status === 503) {
+    setStatus(`Storage is busy or a pilot limit was hit. Try again later. (${e.message})`, true);
   } else {
-    setStatus(`Storage error: ${e.message}`, true);
+    setStatus(e.message, true);
   }
 }
 
-function connect(c) {
-  try {
-    store = new Store(validate(c));
-  } catch (e) {
-    showConnect(`Bad credentials: ${e.message}`);
-    status.className = 'status error';
-    return;
-  }
-  saveCredentials(c);
-  $('connect').hidden = true;
-  $('app').hidden = false;
-  load();
-}
-
-$('connect-form').addEventListener('submit', ev => {
-  ev.preventDefault();
-  let parsed;
-  try { parsed = JSON.parse($('creds').value); }
-  catch { showConnect('That is not valid JSON.'); status.className = 'status error'; return; }
-  $('creds').value = '';
-  connect(parsed);
-});
 $('add-form').addEventListener('submit', ev => {
   ev.preventDefault();
   const text = input.value.trim();
@@ -160,17 +118,10 @@ $('add-form').addEventListener('submit', ev => {
 });
 $('clear-done').addEventListener('click', () => mutate(ts => ts.filter(t => !t.done)));
 $('refresh').addEventListener('click', load);
-$('share').addEventListener('click', async () => {
-  const c = JSON.parse(localStorage.getItem(LS_KEY));
-  const url = location.origin + location.pathname + '#' + new URLSearchParams(c).toString();
-  try { await navigator.clipboard.writeText(url); setStatus('Share link copied. Anyone with it can read and edit this list.'); }
-  catch { prompt('Copy this link:', url); }
-});
-$('disconnect').addEventListener('click', () => {
-  try { localStorage.removeItem(LS_KEY); } catch {}
-  todos = []; version = 0; store = null;
-  showConnect('Disconnected.');
-});
 
-const saved = loadCredentials();
-if (saved) connect(saved); else showConnect();
+await customElements.whenDefined('vcs-connect');
+connection = document.querySelector('vcs-connect');
+connection.addEventListener('vcs-connected', () => { store = null; load(); });
+render();
+if (connection.connected) load();
+else setStatus('Nothing saved yet. Your first save creates a private store for this browser.');

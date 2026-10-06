@@ -61,11 +61,5 @@ footer span { flex: 1; }
 .status { margin-top: 16px; font-size: .9rem; color: var(--muted); min-height: 1.4em; }
 .status.error { background: var(--warn-bg); color: var(--warn-ink); padding: 10px 12px; border-radius: 8px; }
 .status code { font-size: .85em; }
-textarea {
-  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
-  background: transparent; color: inherit; font: .85rem/1.4 ui-monospace, Menlo, monospace; resize: vertical;
-}
-textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-#connect form { flex-direction: column; }
-#connect p { color: var(--muted); font-size: .9rem; margin: 0 0 10px; }
 footer { flex-wrap: wrap; }
+vcs-connect { display: block; margin-top: 20px; }
