@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Little To-Do</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="card">
+    <header>
+      <h1>Little To-Do</h1>
+      <p class="sub">Stored encrypted on <a href="https://vibecodestorage.com" target="_blank" rel="noopener">vibecodestorage.com</a></p>
+    </header>
+
+    <form id="add-form" autocomplete="off">
+      <input id="new-todo" type="text" placeholder="What needs doing?" maxlength="200" required>
+      <button type="submit">Add</button>
+    </form>
+
+    <ul id="list" aria-live="polite"></ul>
+
+    <footer>
+      <span id="count"></span>
+      <button id="clear-done" type="button" class="link">Clear done</button>
+      <button id="refresh" type="button" class="link">Refresh</button>
+    </footer>
+
+    <div id="status" class="status" role="status"></div>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
